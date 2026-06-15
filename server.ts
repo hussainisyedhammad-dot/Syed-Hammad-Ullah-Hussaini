@@ -22,19 +22,21 @@ async function startServer() {
     }
   });
 
-  // API Route for level generation
-  app.post("/api/generate-level", async (req, res) => {
+  // API Route for procedural battlefield/level design
+  app.post("/api/generate-skirmish", async (req, res) => {
     try {
       const { prompt } = req.body;
-      const userPrompt = prompt || "obstacle layout like a symmetric cross";
+      const userPrompt = prompt || "rugged desert badlands with oil derrick hazards";
 
-      const promptString = `Design a custom grid level of size 20x20 based on this style request: "${userPrompt}". 
-Return a list of solid walls (obstacle coordinates). Each wall must have separate row (r) and column (c) between 0 and 19.
-CRITICAL DESIGN RULES:
-1. Do not place any obstacle at or near the center coordinates {r: 10, c: 10} to allow the snake to spawn safely. Spawn area is 5x5 zone in the center which must be completely empty: row 8 to 12, col 8 to 12 must NOT have obstacles.
-2. Ensure the level is playable: do not trap or seal any areas. Leaving clear spaces and paths of at least 2 units wide is recommended.
-3. Keep the total number of obstacle cells between 15 and 45. Too many obstacles make it impossible to play.
-4. Try to be creative, represent the requested visual style or theme.`;
+      const promptString = `Design a procedural skirmish map layout for a Command & Conquer RTS match. Player is on the left side, AI is on the right side.
+Style Request: "${userPrompt}". 
+Provide:
+1. Map Name: a bold military name.
+2. Atmosphere: a brief description of the weather and terrain hazards.
+3. Terrain Theme: one of "DESERT", "SNOW", "URBAN", "TOXIC_WASTELAND", "TEMPERATE".
+4. Color scheme (primary hue values for landscape and radar).
+5. Battlefield hazards / Obstacles: A list of coordinate coordinate zones: x (0 to 100), y (0 to 100), radius (representing ruins, rivers, oil derricks, or debris).
+6. Recommended Supply Dock locations: A list of coordinates (x, y) where Supply centers should harvest. Ensure docks are placed in contesting middle or base zones (e.g. {x: 50, y: 50} for middle, {x: 20, y: 30} for player, {x: 80, y: 70} for enemy).`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
@@ -44,77 +46,125 @@ CRITICAL DESIGN RULES:
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              levelName: { type: Type.STRING, description: "A creative, short, cool name of the level" },
-              themeDescription: { type: Type.STRING, description: "A brief atmospheric description explaining how this represents the prompt" },
-              colorTheme: { type: Type.STRING, description: "A main tailwind theme style (one of: 'purple', 'emerald', 'sky', 'amber', 'rose', 'indigo', 'violet', 'cyan', 'lime')" },
-              obstacles: {
+              mapName: { type: Type.STRING, description: "Official military designation name of the theater" },
+              atmosphere: { type: Type.STRING, description: "Tactical weather and hazards brief" },
+              terrainTheme: { type: Type.STRING, description: "RTS biome type" },
+              primaryColor: { type: Type.STRING, description: "HEX color or primary Tailwind class for grid accents (e.g. '#e2ba7e' for desert sand)" },
+              hazards: {
                 type: Type.ARRAY,
-                description: "Array of coordinates to put solid blocks",
+                description: "Array of passive obstacles / terrain ruins",
                 items: {
                   type: Type.OBJECT,
                   properties: {
-                    r: { type: Type.INTEGER, description: "Row index (0-19)" },
-                    c: { type: Type.INTEGER, description: "Column index (0-19)" }
+                    x: { type: Type.INTEGER, description: "Horizontal center (0 to 100)" },
+                    y: { type: Type.INTEGER, description: "Vertical center (0 to 100)" },
+                    r: { type: Type.INTEGER, description: "Radius of blockage zone (5 to 15)" },
+                    label: { type: Type.STRING, description: "Name of terrain blocker (e.g. 'Destroyed Bunker', 'Toxic Spill', 'Oil Derrick')" }
                   },
-                  required: ["r", "c"]
+                  required: ["x", "y", "r", "label"]
                 }
               },
-              recommendedSpeed: { type: Type.INTEGER, description: "Speed in ms (from 75 to 140, fast/slow depending on obstacle density)" }
+              supplyDocks: {
+                type: Type.ARRAY,
+                description: "Map resource zones containing crates or oil",
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    x: { type: Type.INTEGER, description: "X position (15 to 85)" },
+                    y: { type: Type.INTEGER, description: "Y position (15 to 85)" },
+                    amount: { type: Type.INTEGER, description: "Credits amount (通常 5000 to 15000)" }
+                  },
+                  required: ["x", "y", "amount"]
+                }
+              }
             },
-            required: ["levelName", "themeDescription", "colorTheme", "obstacles", "recommendedSpeed"]
+            required: ["mapName", "atmosphere", "terrainTheme", "primaryColor", "hazards", "supplyDocks"]
           }
         }
       });
 
-      const levelData = JSON.parse(response.text || "{}");
-      res.json(levelData);
+      const mapData = JSON.parse(response.text || "{}");
+      res.json(mapData);
     } catch (err: any) {
-      console.error("Error generating level:", err);
-      // Fallback level
-      res.status(500).json({
-        error: "Failed to generate custom level from Gemini.",
-        levelName: "Digital Frontier",
-        themeDescription: "A fallback level designed when the AI was busy, simple yet effective.",
-        colorTheme: "purple",
-        obstacles: [
-          { r: 4, c: 4 }, { r: 4, c: 5 }, { r: 4, c: 6 },
-          { r: 4, c: 13 }, { r: 4, c: 14 }, { r: 4, c: 15 },
-          { r: 15, c: 4 }, { r: 15, c: 5 }, { r: 15, c: 6 },
-          { r: 15, c: 13 }, { r: 15, c: 14 }, { r: 15, c: 15 }
+      console.error("Error generating skirmish map:", err);
+      // Perfect fallback map
+      res.json({
+        mapName: "Tournament Desert",
+        atmosphere: "Arid landscape with sandstorm warning. Highly active lanes with high-ground choke points.",
+        terrainTheme: "DESERT",
+        primaryColor: "#d97706",
+        hazards: [
+          { x: 50, y: 50, r: 10, label: "Oil Derrick Outpost" },
+          { x: 30, y: 70, r: 8, label: "Tiberium/Toxic Pool" },
+          { x: 70, y: 30, r: 8, label: "Rock Barriers" }
         ],
-        recommendedSpeed: 100
+        supplyDocks: [
+          { x: 20, y: 25, amount: 8000 },
+          { x: 80, y: 75, amount: 8000 },
+          { x: 50, y: 50, amount: 15000 }
+        ]
       });
     }
   });
 
-  // API Route for dynamic commentary
+  // API Route for radio transmissions with GLA, USA, and China Generals
   app.post("/api/commentary", async (req, res) => {
     try {
-      const { levelName, score, event, aiAutoplay, highscore, customQuestion } = req.body;
+      const { playerFaction, opponentFaction, credits, kills, losses, event, chatQuestion } = req.body;
 
-      const systemInstruction = "You are the 'AI Snake Sensei', a witty, enthusiastic, and highly technical retro gaming coach. " +
-        "Keep your replies very short (under 25 words). Be direct, retro-infused, funny, and reactive. " +
-        "Reference things like byte sectors, raster scans, algorithms, human neural loops, or electronic speeds. " +
-        "Do not use generic assistant speak. Do not mention code details, maintain retro-gamer style.";
+      // Establish character prompts
+      const characterPrompts: Record<string, string> = {
+        USA: "General Granger, the high-tech USA Air Force Commander. He speaks with extreme military discipline, relying on lasers, drones, air superiority, and supreme rules of engagement. Secure, proud, technological, slightly condescending towards GLA.",
+        CHINA: "General Tsing Shi Tao, the Nuclear armor Tactician from China. He is aggressive, patriotic, talks about China's massive nuclear tanks, nationalistic pride, propaganda towers, and burning enemy locations down in radioactive fire.",
+        GLA: "Dr. Thrax, the GLA bio-weapon specialist. He is delightfully maniacal, speaks with a chaotic, toxic accent, loves chemical weapons (Anthrax-Beta!), tunnels, ambush strategies, scraps, and hates high-tech radar arrays."
+      };
 
-      let prompt = `Level: ${levelName}, Current Score: ${score}, Personal Highscore: ${highscore}, AI Autoplay Mode: ${aiAutoplay ? "ENABLED" : "DISABLED"}. `;
+      const systemInstruction = `You are a legendary RTS opponent AI General from Command & Conquer Generals: Zero Hour.
+Our player represents ${playerFaction}. The AI opponent represents ${opponentFaction}.
+You will speak as either the ADVISOR, the PLAYER'S GENERAL, or the ENEMY OPPONENT GENERAL depending on the event context.
+Character details for each faction General:
+- USA: ${characterPrompts.USA}
+- CHINA: ${characterPrompts.CHINA}
+- GLA: ${characterPrompts.GLA}
 
-      if (customQuestion) {
-        prompt += `The player typed a direct query to you: "${customQuestion}". Answer them directly, with retro-gaming flair!`;
-      } else if (event === "start") {
-        prompt += "Player just started the game.";
-      } else if (event === "eat") {
-        prompt += `Snake just ate a byte of data! Score increased to ${score}.`;
-      } else if (event === "level_up") {
-        prompt += `Player completed the level and advanced to a new difficulty arena!`;
-      } else if (event === "die") {
-        prompt += `Crash! Game over. Final score reached is ${score}. Encourage them to retry or use AI Autoplay.`;
-      } else if (event === "ai_on") {
-        prompt += "AI Autoplay has been enabled. The pathfinding heuristic BFS bot was activated to play on behalf of humans.";
-      } else if (event === "ai_off") {
-        prompt += "AI Autoplay disabled. Human has taken manual hardware control back.";
+Keep your replies extremely short, punchy, atmospheric, and military-oriented (under 30 words).
+Inject classic quotes, references (supply docks, build queues, Patriot missiles, Overlord speaker towers, Scud storms, Anthrax, Particle beams, power levels).
+Do not use generic assistance phrases. Stay 100% in-character.`;
+
+      let prompt = `Game context: Player Faction is ${playerFaction}, Opponent is ${opponentFaction}. Credits: $${credits}. Combat Stats: ${kills} Kills, ${losses} losses. `;
+
+      if (chatQuestion) {
+        prompt += `The player has sent a direct tactical question over the comm links. It reads: "${chatQuestion}". Answer as the ENEMY General ${opponentFaction} taunting/reacting to them, or as your own commander advising them.`;
       } else {
-        prompt += "Give general tactical advice for playing snake.";
+        switch (event) {
+          case "start":
+            prompt += `Battle is beginning on the skirmish line! Introduce yourself as the enemy faction ${opponentFaction} commander and issue an intimidating or confident opening warning to the player.`;
+            break;
+          case "superweapon_launch":
+            prompt += `CRITICAL: The Player has launched their devastating superweapon (Particle Cannon / Nuclear Missile / Scud Storm)! Answer in pure panic or defiant anger as General of ${opponentFaction}`;
+            break;
+          case "superweapon_enemy_launch":
+            prompt += `TACTICAL ACTION: The enemy General (${opponentFaction}) has launched their superweapon at the player! Deliver a triumphant, villainous taunt.`;
+            break;
+          case "player_unit_died":
+            prompt += `A unit of the player's Army was shredded by your defenses. Deliver a short, mocking tactical taunt.`;
+            break;
+          case "build_structure":
+            prompt += `The player just completed a major base structure. Gibe them about their strategy or highlight your superior faction blueprints.`;
+            break;
+          case "radiation_spread":
+            prompt += `Chemical gas or green nuclear fallout is active in the grid. Deliver a toxic or scientific commentary.`;
+            break;
+          case "victory":
+            prompt += `The player defeated your base! Deliver a defeated but threatening retreat voice line.`;
+            break;
+          case "defeat":
+            prompt += `You crushed the player's Command Center! Give an ultimate victory speech.`;
+            break;
+          default:
+            prompt += `Provide a random battle banter or tactical advice relative to the current skirmish.`;
+            break;
+        }
       }
 
       const response = await ai.models.generateContent({
@@ -125,10 +175,10 @@ CRITICAL DESIGN RULES:
         }
       });
 
-      res.json({ commentary: response.text || "Scanning grid..." });
+      res.json({ commentary: response.text || "Visual interface online, commander." });
     } catch (err) {
       console.error(err);
-      res.json({ commentary: "Data link established. Secure your grid lines, player!" });
+      res.json({ commentary: "Secure transmission online. Maintain combat focus, General!" });
     }
   });
 
@@ -148,7 +198,7 @@ CRITICAL DESIGN RULES:
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`C&C Generals Server running on http://localhost:${PORT}`);
   });
 }
 

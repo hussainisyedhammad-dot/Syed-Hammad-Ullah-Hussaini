@@ -1,6 +1,6 @@
 {
-  "name": "AI Snake Game",
-  "description": "An AI-powered Snake Game featuring multiple levels, increasing speed variables, and an intelligent AI autoplay mode.",
+  "name": "C&C Generals: AI Zero Hour",
+  "description": "Command USA, China, or GLA in an immersive AI-enabled RTS battle simulator with dynamic unit queues, base structures, tactical superweapons, and interactive AI General commentators.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
