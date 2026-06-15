@@ -1,0 +1,6 @@
+{
+  "name": "AI Snake Game",
+  "description": "An AI-powered Snake Game featuring multiple levels, increasing speed variables, and an intelligent AI autoplay mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
